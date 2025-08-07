@@ -4,4 +4,3 @@ SpeechRecognition
 pillow
 opencv-python-headless
 numpy
-pyzbar
