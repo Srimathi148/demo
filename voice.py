@@ -1,53 +1,85 @@
-from PIL import Image
 import streamlit as st
 import wikipedia
 import speech_recognition as sr
 import tempfile
 import os
-import numpy as np
+from PIL import Image
 import cv2
+import numpy as np
+import pandas as pd
+import datetime
+from deep_translator import GoogleTranslator
 
+# ---------- CONFIG & STYLE ----------
 st.set_page_config(page_title="Chatbot + QR Scanner", layout="centered")
-st.markdown(
-    """
-    <style>
-    .glow-icon {
-        width: 100px;
-        height: 100px;
-        border-radius: 50%;
-        background: url('https://cdn-icons-png.flaticon.com/512/4712/4712039.png') no-repeat center/cover;
-        box-shadow: 0 0 20px #00ffcc, 0 0 30px #00ffcc, 0 0 40px #00ffcc;
-        animation: pulse 2s infinite;
-        margin: auto;
-    }
-    @keyframes pulse {
-        0% { box-shadow: 0 0 20px #00ffcc; }
-        50% { box-shadow: 0 0 40px #00ffcc; }
-        100% { box-shadow: 0 0 20px #00ffcc; }
-    }
-    </style>
-    <div class="glow-icon"></div>
-    """,
-    unsafe_allow_html=True
-)
+
+# Glow icon
+st.markdown("""
+<style>
+.glow-icon {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    background: url('https://cdn-icons-png.flaticon.com/512/4712/4712039.png') no-repeat center/cover;
+    box-shadow: 0 0 20px #00ffcc, 0 0 30px #00ffcc, 0 0 40px #00ffcc;
+    animation: pulse 2s infinite;
+    margin: auto;
+}
+@keyframes pulse {
+    0% { box-shadow: 0 0 20px #00ffcc; }
+    50% { box-shadow: 0 0 40px #00ffcc; }
+    100% { box-shadow: 0 0 20px #00ffcc; }
+}
+</style>
+<div class="glow-icon"></div>
+""", unsafe_allow_html=True)
+
 st.title("🤖 Chatbot + 📷 QR Code Scanner")
 
-# Tabs
+# Dark mode toggle
+dark_mode = st.toggle("🌗 Dark Mode")
+if dark_mode:
+    st.markdown("""
+        <style>
+        .stApp {
+            background-color: #1e1e1e;
+            color: white;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+# ---------- TRANSLATION FUNCTIONS ----------
+def translate_text(text, source_lang="auto", target_lang="en"):
+    try:
+        translated = GoogleTranslator(source=source_lang, target=target_lang).translate(text)
+        return translated
+    except Exception as e:
+        return f"⚠️ Translation error: {e}"
+
+# ---------- TABS ----------
 tab1, tab2, tab3 = st.tabs(["📚 Wikipedia Chatbot", "📷 QR Code Scanner", "ℹ️ About Us"])
 
-# --- TAB 1: Wikipedia Chatbot ---
+# ---------- TAB 1: Wikipedia Chatbot ----------
 with tab1:
     st.subheader("Ask anything. Type or speak!")
 
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    def get_wikipedia_summary(query):
+    # Let user pick their language for Q&A
+    lang = st.selectbox("Choose your language:", options=["en", "kn", "ta", "fr", "es", "de", "hi", "zh", "ar", "ru", "ja"], index=0)
+
+    def get_wikipedia_summary(query, user_lang="en"):
         try:
-            results = wikipedia.search(query)
+            # Translate query to English to search Wikipedia
+            query_en = translate_text(query, source_lang=user_lang, target_lang="en")
+            results = wikipedia.search(query_en)
             if not results:
                 return "❌ Sorry, no results found."
             summary = wikipedia.summary(results[0], sentences=2, auto_suggest=False, redirect=True)
+            if user_lang != "en":
+                summary_translated = translate_text(summary, source_lang="en", target_lang=user_lang)
+                return summary_translated
             return summary
         except wikipedia.DisambiguationError as e:
             return f"⚠️ Too broad. Did you mean: {', '.join(e.options[:5])}?"
@@ -69,25 +101,24 @@ with tab1:
         with sr.AudioFile(tmp_filename) as source:
             audio_data = recognizer.record(source)
             try:
-                recognized_text = recognizer.recognize_google(audio_data)
+                recognized_text = recognizer.recognize_google(audio_data, language=lang)
                 st.success(f"You said: {recognized_text}")
                 user_input_text = recognized_text
             except sr.UnknownValueError:
                 st.error("Sorry, could not understand your voice.")
             except sr.RequestError:
                 st.error("Could not connect to speech recognition service.")
-
         os.remove(tmp_filename)
 
     user_input = user_input_text.strip() if user_input_text else ""
 
     if user_input:
         if user_input.lower() == "hi":
-            response = "Hello!"
+            response = translate_text("Hello!", source_lang="en", target_lang=lang)
         elif user_input.lower() == "what is your name":
-            response = "I'm a chatbot."
+            response = translate_text("I'm a chatbot.", source_lang="en", target_lang=lang)
         else:
-            response = get_wikipedia_summary(user_input)
+            response = get_wikipedia_summary(user_input, user_lang=lang)
 
         st.session_state.chat_history.append((user_input, response))
 
@@ -102,64 +133,72 @@ with tab1:
             st.session_state.chat_history.clear()
             st.success("Chat history cleared!")
 
-# --- TAB 2: QR Code Scanner ---
-# --- TAB 2: QR Code Scanner ---
+# ---------- TAB 2: QR Code Scanner ----------
 with tab2:
-    st.subheader("📷 Upload a QR Code Image to Scan")
+    st.subheader("QR Code Scanner 📷")
 
-    uploaded_file = st.file_uploader("Upload QR image", type=["png", "jpg", "jpeg"])
+    uploaded_img = st.file_uploader("Upload Image with QR Code", type=["png", "jpg", "jpeg"])
 
-    def decode_qr_opencv(image_pil):
-        # Convert to OpenCV format (numpy array)
-        image_rgb = image_pil.convert("RGB")  # Ensure RGB mode
-        image_np = np.array(image_rgb)
-        image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
-
-        # Initialize QRCode detector
+    def detect_qr_opencv(image):
+        img_np = np.array(image.convert('RGB'))
         detector = cv2.QRCodeDetector()
-        data, points, _ = detector.detectAndDecode(image_cv)
+        data, bbox, _ = detector.detectAndDecode(img_np)
         return data if data else None
 
-    if uploaded_file is not None:
-        try:
-            # Load and display image
-            img_pil = Image.open(uploaded_file)
-            st.image(img_pil, caption="Uploaded QR Code", use_column_width=True)
+    def save_qr(data):
+        file = "qr_scan_log.csv"
+        now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        df = pd.DataFrame([[data, now]], columns=["Data", "Timestamp"])
+        if os.path.exists(file):
+            df.to_csv(file, mode='a', header=False, index=False)
+        else:
+            df.to_csv(file, index=False)
 
-            # Decode QR
-            decoded_data = decode_qr_opencv(img_pil)
+    if uploaded_img:
+        img = Image.open(uploaded_img)
+        st.image(img, caption="Uploaded Image", use_column_width=True)
+        data = detect_qr_opencv(img)
+        if data:
+            st.success(f"✅ QR Code Detected: {data}")
+            save_qr(data)
+        else:
+            st.warning("No QR code found in the image.")
 
-            if decoded_data:
-                st.success(f"🔓 Decoded Data: {decoded_data}")
-            else:
-                st.warning("⚠️ No QR code detected. Try another image or check clarity.")
-        except Exception as e:
-            st.error(f"❌ Error processing image: {e}")
+    with st.expander("📄 QR Scan History"):
+        if os.path.exists("qr_scan_log.csv"):
+            df = pd.read_csv("qr_scan_log.csv")
+            st.dataframe(df)
+        else:
+            st.info("No scan history found.")
 
-# --- TAB 3: About Us ---
+    if st.button("🧹 Clear QR Scan History"):
+        if os.path.exists("qr_scan_log.csv"):
+            os.remove("qr_scan_log.csv")
+            st.success("Scan history cleared.")
+
+# ---------- TAB 3: About Us ----------
 with tab3:
     st.subheader("About Us")
     st.markdown("""
     ### Welcome to Chatbot + QR Scanner!
 
     This app combines two handy tools into one interface:
-
-    - 🤖 **Wikipedia Chatbot**: Ask questions by typing or uploading your voice! Powered by Wikipedia API and speech recognition.
+    - 🤖 **Wikipedia Chatbot**: Ask questions by typing or uploading your voice!
     - 📷 **QR Code Scanner**: Upload images containing QR codes and get the decoded information instantly.
 
     ---
     **Developed by:**  
-    DHARSHINI J, SRIMATHI K, HARSHITHA B.M, AKSHAYA V
+    DHARSHINI J, SRIMATHI K, HARSHITHA B.M, AKSHAYA V 
 
     **Contact:**  
-    - Email: dharshudharshu148@gmail.com, acquireness@gmail.com ,manjunath.m37@gmail.com, akshayavelu31@gmail.com    
+    - Email: dharshudharshu148@gmail.com, acquireness@gmail.com, manjunath.m37@gmail.com, akshayavelu31@gmail.com 
     
     ---
-    Thank you for using our app! Feel free to contribute or suggest features.
+    Thank you for using our app!
     """)
 
     st.subheader("🔗 Link of the Project")
-    st.markdown("[Click here to view the project](http://localhost:8513/)")
+    st.markdown("[Click here to view the project](https://igq6tcjypjpmh9hivnabjc.streamlit.app/)")
 
     st.subheader("🖼️ Snapshots of the Project")
 
@@ -183,10 +222,3 @@ with tab3:
             st.image(fpath, use_column_width=True)
     else:
         st.info("No snapshots uploaded yet.")
-
-
-
-
-
-
-
