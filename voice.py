@@ -103,29 +103,39 @@ with tab1:
             st.success("Chat history cleared!")
 
 # --- TAB 2: QR Code Scanner ---
+# --- TAB 2: QR Code Scanner ---
 with tab2:
     st.subheader("📷 Upload a QR Code Image to Scan")
 
     uploaded_file = st.file_uploader("Upload QR image", type=["png", "jpg", "jpeg"])
 
-    def decode_qr_opencv(img):
+    def decode_qr_opencv(image_pil):
+        # Convert to OpenCV format (numpy array)
+        image_rgb = image_pil.convert("RGB")  # Ensure RGB mode
+        image_np = np.array(image_rgb)
+        image_cv = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+
+        # Initialize QRCode detector
         detector = cv2.QRCodeDetector()
-        data, points, _ = detector.detectAndDecode(img)
-        if points is not None and data:
-            return data
-        return None
+        data, points, _ = detector.detectAndDecode(image_cv)
+        return data if data else None
 
-    if uploaded_file:
-        img = Image.open(uploaded_file)
-        st.image(img, caption="Uploaded QR Code", use_column_width=True)
+    if uploaded_file is not None:
+        try:
+            # Load and display image
+            img_pil = Image.open(uploaded_file)
+            st.image(img_pil, caption="Uploaded QR Code", use_column_width=True)
 
-        img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-        decoded_data = decode_qr_opencv(img_cv)
+            # Decode QR
+            decoded_data = decode_qr_opencv(img_pil)
 
-        if decoded_data:
-            st.success(f"🔓 Decoded Data: {decoded_data}")
-        else:
-            st.warning("⚠️ No QR code detected.")
+            if decoded_data:
+                st.success(f"🔓 Decoded Data: {decoded_data}")
+            else:
+                st.warning("⚠️ No QR code detected. Try another image or check clarity.")
+        except Exception as e:
+            st.error(f"❌ Error processing image: {e}")
+
 # --- TAB 3: About Us ---
 with tab3:
     st.subheader("About Us")
@@ -173,6 +183,7 @@ with tab3:
             st.image(fpath, use_column_width=True)
     else:
         st.info("No snapshots uploaded yet.")
+
 
 
 
