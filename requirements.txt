@@ -1,6 +1,8 @@
 streamlit
 wikipedia
 SpeechRecognition
+deep-translator
 pillow
 opencv-python-headless
+pandas
 numpy
