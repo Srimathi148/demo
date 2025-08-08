@@ -146,7 +146,7 @@ with tab3:
     """)
 
     st.subheader("🔗 Link of the Project")
-    st.markdown("[Click here to view the project](https://igq6tcjypjpmh9hivnabjc.streamlit.app/)")
+    st.markdown("[Click here to view the project](http://localhost:8513/)")
 
     st.subheader("🖼️ Snapshots of the Project")
 
@@ -170,6 +170,7 @@ with tab3:
             st.image(fpath, use_column_width=True)
     else:
         st.info("No snapshots uploaded yet.")
+
 
 
 
