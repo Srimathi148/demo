@@ -4,6 +4,9 @@ import wikipedia
 import speech_recognition as sr
 import tempfile
 import os
+import numpy as np
+import cv2
+
 st.set_page_config(page_title="Chatbot + QR Scanner", layout="centered")
 st.markdown(
     """
@@ -170,6 +173,7 @@ with tab3:
             st.image(fpath, use_column_width=True)
     else:
         st.info("No snapshots uploaded yet.")
+
 
 
 
