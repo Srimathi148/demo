@@ -1,3 +1,4 @@
+
 import streamlit as st
 import wikipedia
 import speech_recognition as sr
@@ -140,18 +141,17 @@ with tab3:
 
     ---
     **Developed by:**  
-    AKSHAYA V, DHARSHINI J, HARSHITHA B.M, SRIMATHI K
+    DHARSHINI J, SRIMATHI K, HARSHITHA B.M, AKSHAYA V
 
     **Contact:**  
-    - Email: dharshudharshu148@gmail.com, acquireness@gmail.com  
-    - Website: [https://yourwebsite.com](https://yourwebsite.com)
-
+    - Email: dharshudharshu148@gmail.com, acquireness@gmail.com ,manjunath.m37@gmail.com, akshayavelu31@gmail.com    
+    
     ---
     Thank you for using our app! Feel free to contribute or suggest features.
     """)
 
     st.subheader("🔗 Link of the Project")
-    st.markdown("[Click here to view the project](https://your-project-link.com)")
+    st.markdown("[Click here to view the project](https://igq6tcjypjpmh9hivnabjc.streamlit.app/)")
 
     st.subheader("🖼️ Snapshots of the Project")
 
