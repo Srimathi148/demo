@@ -1,4 +1,4 @@
-
+from PIL import Image
 import streamlit as st
 import wikipedia
 import speech_recognition as sr
@@ -170,6 +170,7 @@ with tab3:
             st.image(fpath, use_column_width=True)
     else:
         st.info("No snapshots uploaded yet.")
+
 
 
 
