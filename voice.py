@@ -7,7 +7,6 @@ import os
 from PIL import Image
 import cv2
 import numpy as np
-from pyzbar.pyzbar import decode
 
 st.set_page_config(page_title="Chatbot + QR Scanner", layout="centered")
 st.markdown(
@@ -34,19 +33,16 @@ st.markdown(
 )
 st.title("🤖 Chatbot + 📷 QR Code Scanner")
 
-
-# Tabs (add third tab)
+# Tabs
 tab1, tab2, tab3 = st.tabs(["📚 Wikipedia Chatbot", "📷 QR Code Scanner", "ℹ️ About Us"])
 
 # --- TAB 1: Wikipedia Chatbot ---
 with tab1:
     st.subheader("Ask anything. Type or speak!")
 
-    # Initialize chat history
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    # Function: Get Wikipedia summary
     def get_wikipedia_summary(query):
         try:
             results = wikipedia.search(query)
@@ -61,13 +57,10 @@ with tab1:
         except Exception as e:
             return f"⚠️ Error: {str(e)}"
 
-    # 🔠 Text input
-    user_input = st.text_input("Type your question here:")
+    user_input_text = st.text_input("Type your question here:")
 
-    # 🎤 Voice input (upload)
     audio_file = st.file_uploader("🎤 Or upload your voice question (WAV format)", type=["wav"])
 
-    # Process voice file
     if audio_file is not None:
         recognizer = sr.Recognizer()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
@@ -77,8 +70,9 @@ with tab1:
         with sr.AudioFile(tmp_filename) as source:
             audio_data = recognizer.record(source)
             try:
-                user_input = recognizer.recognize_google(audio_data)
-                st.success(f"You said: {user_input}")
+                recognized_text = recognizer.recognize_google(audio_data)
+                st.success(f"You said: {recognized_text}")
+                user_input_text = recognized_text
             except sr.UnknownValueError:
                 st.error("Sorry, could not understand your voice.")
             except sr.RequestError:
@@ -86,12 +80,18 @@ with tab1:
 
         os.remove(tmp_filename)
 
-    # Respond if input exists
+    user_input = user_input_text.strip() if user_input_text else ""
+
     if user_input:
-        response = get_wikipedia_summary(user_input)
+        if user_input.lower() == "hi":
+            response = "Hello!"
+        elif user_input.lower() == "what is your name":
+            response = "I'm a chatbot."
+        else:
+            response = get_wikipedia_summary(user_input)
+
         st.session_state.chat_history.append((user_input, response))
 
-    # Display chat history
     if st.session_state.chat_history:
         st.markdown("### 💬 Chat History")
         for idx, (user, bot) in enumerate(reversed(st.session_state.chat_history), 1):
@@ -99,7 +99,6 @@ with tab1:
             st.markdown(f"**🤖 Bot {idx}:** {bot}")
             st.markdown("---")
 
-        # 🧹 Clear history
         if st.button("🗑️ Clear Chat History"):
             st.session_state.chat_history.clear()
             st.success("Chat history cleared!")
@@ -110,21 +109,25 @@ with tab2:
 
     uploaded_file = st.file_uploader("Upload QR image", type=["png", "jpg", "jpeg"])
 
+    def decode_qr_opencv(img):
+        detector = cv2.QRCodeDetector()
+        data, points, _ = detector.detectAndDecode(img)
+        if points is not None and data:
+            return data
+        return None
+
     if uploaded_file:
         img = Image.open(uploaded_file)
         st.image(img, caption="Uploaded QR Code", use_column_width=True)
 
-        # Decode
         img_cv = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
-        decoded_objs = decode(img_cv)
+        decoded_data = decode_qr_opencv(img_cv)
 
-        if decoded_objs:
-            for obj in decoded_objs:
-                data = obj.data.decode("utf-8")
-                st.success(f"🔓 Decoded Data: {data}")
+        if decoded_data:
+            st.success(f"🔓 Decoded Data: {decoded_data}")
         else:
             st.warning("⚠️ No QR code detected.")
-            # --- TAB 3: About Us ---
+# --- TAB 3: About Us ---
 with tab3:
     st.subheader("About Us")
     st.markdown("""
@@ -137,29 +140,24 @@ with tab3:
 
     ---
     **Developed by:**  
-    AKSHAYA V, DHARSHINI J, HARSHITHA B.M, SRIMATHI K
-                
-                            
+    DHARSHINI J, SRIMATHI K, HARSHITHA B.M, AKSHAYA V
 
     **Contact:**  
-    - Email: dharshudharshu148@gmail.com, 
-             acquireness@gmail.com      
-    - Website: [https://yourwebsite.com](https://yourwebsite.com)
-
+    - Email: dharshudharshu148@gmail.com, acquireness@gmail.com ,manjunath.m37@gmail.com, akshayavelu31@gmail.com    
+    
     ---
     Thank you for using our app! Feel free to contribute or suggest features.
     """)
-# Project Link
-    st.subheader("🔗 Link of the Project")
-    st.markdown("[Click here to view the project](https://your-project-link.com)")
 
-    # Snapshots Section
+    st.subheader("🔗 Link of the Project")
+    st.markdown("[Click here to view the project](https://igq6tcjypjpmh9hivnabjc.streamlit.app/)")
+
     st.subheader("🖼️ Snapshots of the Project")
 
     SNAPSHOT_DIR = "snapshots"
     os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
-    uploaded_files = st.file_uploader("Upload snapshots (only once)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("Upload snapshots (multiple allowed)", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
 
     if uploaded_files:
         for file in uploaded_files:
